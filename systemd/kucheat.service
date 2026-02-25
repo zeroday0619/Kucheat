@@ -1,0 +1,16 @@
+[Unit]
+Description=Kucheat – CHZZK Live Stream Notification Daemon
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/kucheat daemon
+Restart=on-failure
+RestartSec=10
+Environment=RUST_LOG=kucheat=info
+# D-Bus session address is needed for desktop notifications
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/%U/bus
+
+[Install]
+WantedBy=default.target
