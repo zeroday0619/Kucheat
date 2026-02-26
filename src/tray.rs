@@ -268,23 +268,57 @@ pub async fn run(source: StateSource) -> Result<()> {
     match source {
         // ── Daemon in same process: react to watch channel instantly ──
         StateSource::Watch(mut rx) => {
+            // Poll the config file every 2 s so that `kucheat add/remove`
+            // is reflected in the tray without waiting for the next
+            // daemon state push.
+            let mut config_poll = tokio::time::interval(Duration::from_secs(2));
+            config_poll.tick().await; // consume immediate first tick
+
+            let mut last_channel_ids: Vec<String> =
+                config.channels.iter().map(|c| c.id.clone()).collect();
+
             loop {
-                // Block until the daemon pushes a new state.
-                if rx.changed().await.is_err() {
-                    tracing::warn!("Daemon state channel closed, stopping tray sync");
-                    break;
+                tokio::select! {
+                    // Daemon pushed a new state – update everything.
+                    result = rx.changed() => {
+                        if result.is_err() {
+                            tracing::warn!("Daemon state channel closed, stopping tray sync");
+                            break;
+                        }
+
+                        let app_state = rx.borrow_and_update().clone();
+                        let config = Config::load().unwrap_or_default();
+                        last_channel_ids =
+                            config.channels.iter().map(|c| c.id.clone()).collect();
+
+                        {
+                            let mut td = tray_data.lock().unwrap();
+                            td.channels = config.channels;
+                            td.state = app_state;
+                        }
+
+                        handle.update(|_| {}).await;
+                    }
+                    // Config file may have changed – update the channel
+                    // list immediately so add/remove is visible at once.
+                    _ = config_poll.tick() => {
+                        let config = Config::load().unwrap_or_default();
+                        let current_ids: Vec<String> =
+                            config.channels.iter().map(|c| c.id.clone()).collect();
+
+                        if current_ids != last_channel_ids {
+                            last_channel_ids = current_ids;
+                            tracing::info!("Config change detected, updating tray…");
+                            let app_state = rx.borrow().clone();
+                            {
+                                let mut td = tray_data.lock().unwrap();
+                                td.channels = config.channels;
+                                td.state = app_state;
+                            }
+                            handle.update(|_| {}).await;
+                        }
+                    }
                 }
-
-                let app_state = rx.borrow_and_update().clone();
-                let config = Config::load().unwrap_or_default();
-
-                {
-                    let mut td = tray_data.lock().unwrap();
-                    td.channels = config.channels;
-                    td.state = app_state;
-                }
-
-                handle.update(|_| {}).await;
             }
         }
 

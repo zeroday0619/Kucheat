@@ -32,12 +32,34 @@ pub async fn run(state_tx: Option<watch::Sender<AppState>>) -> Result<()> {
     let interval = Duration::from_secs(config.settings.check_interval_secs);
     let mut ticker = time::interval(interval);
 
+    // Short-interval poll for config changes so that `kucheat add/remove`
+    // triggers an immediate check instead of waiting for the next tick.
+    let mut config_poll = time::interval(Duration::from_secs(2));
+    config_poll.tick().await; // consume immediate first tick
+
+    let mut last_channel_ids: Vec<String> =
+        config.channels.iter().map(|c| c.id.clone()).collect();
+
     // Keep a running state across cycles so we never lose track of
     // channels the tray is already displaying.
     let mut state = AppState::load().unwrap_or_default();
 
     loop {
-        ticker.tick().await;
+        // Wait for the normal check interval **or** a config file change.
+        tokio::select! {
+            _ = ticker.tick() => {}
+            _ = config_poll.tick() => {
+                let new_ids: Vec<String> = match Config::load() {
+                    Ok(c) => c.channels.iter().map(|ch| ch.id.clone()).collect(),
+                    Err(_) => continue,
+                };
+                if new_ids == last_channel_ids {
+                    continue; // no change, keep waiting
+                }
+                tracing::info!("Config changed, running immediate channel check…");
+                ticker.reset(); // avoid a redundant check right after
+            }
+        }
 
         // Reload config each cycle so the user can add/remove channels
         // without restarting the daemon.
@@ -48,6 +70,8 @@ pub async fn run(state_tx: Option<watch::Sender<AppState>>) -> Result<()> {
                 continue;
             }
         };
+
+        last_channel_ids = config.channels.iter().map(|c| c.id.clone()).collect();
 
         for channel in &config.channels {
             match client.check_channel_live(&channel.id).await {
