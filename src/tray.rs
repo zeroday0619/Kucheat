@@ -79,7 +79,11 @@ fn link_item<T: ksni::Tray>(label: String, url: String) -> ksni::MenuItem<T> {
 }
 
 fn chzzk_url(path: &str, channel_id: &str) -> String {
-    format!("https://chzzk.naver.com/{path}/{channel_id}")
+    if path.is_empty() {
+        format!("https://chzzk.naver.com/{channel_id}")
+    } else {
+        format!("https://chzzk.naver.com/{path}/{channel_id}")
+    }
 }
 
 // ---------------------------------------------------------------------------
