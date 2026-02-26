@@ -109,6 +109,15 @@ systemctl --user stop kucheat
 
 When the daemon starts, it automatically spawns the system tray in the same process with shared in-memory state.
 
+### Daemon (XDG Autostart)
+
+If you want to run a program while using a desktop session, you can add a desktop file to `~/.config/autostart/` by using command `auto-launch`
+
+```bash
+# Enable auto launch
+kucheat auto-launch install
+```
+
 ### System Tray
 
 ```bash

@@ -1,4 +1,5 @@
 mod api;
+mod autolaunch;
 mod config;
 mod daemon;
 mod notification;
@@ -13,6 +14,14 @@ use clap::{Parser, Subcommand};
 struct Cli {
     #[command(subcommand)]
     command: Commands,
+}
+
+#[derive(Debug, Subcommand)]
+enum AutoLaunchCommand {
+    /// 자동 실행을 위한 .desktop 파일을 ~/.config/autostart/ 에 설치합니다
+    Install,
+    /// 자동 실행을 비활성화합니다
+    Uninstall,
 }
 
 #[derive(Debug, Subcommand)]
@@ -38,6 +47,11 @@ enum Commands {
     List,
     /// 현재 라이브 상태 조회
     Status,
+    /// 자동 실행 상태를 관리
+    AutoLaunch {
+        #[command(subcommand)]
+        command: AutoLaunchCommand,
+    },
 }
 
 #[tokio::main]
@@ -55,8 +69,7 @@ async fn main() -> anyhow::Result<()> {
     match cli.command {
         // ── daemon ─────────────────────────────────────────────────
         Commands::Daemon => {
-            let (state_tx, state_rx) =
-                tokio::sync::watch::channel(state::AppState::default());
+            let (state_tx, state_rx) = tokio::sync::watch::channel(state::AppState::default());
 
             tokio::spawn(async move {
                 let source = tray::StateSource::Watch(state_rx);
@@ -77,11 +90,14 @@ async fn main() -> anyhow::Result<()> {
             let mut config = config::Config::load()?;
 
             let client = api::ChzzkClient::new(&config.api)?;
-            let info = client.get_channel_info(&channel_id).await.unwrap_or_else(|e| {
-                eprintln!("❌ 유효하지 않은 채널 ID입니다: {channel_id}");
-                eprintln!("   오류: {e}");
-                std::process::exit(1);
-            });
+            let info = client
+                .get_channel_info(&channel_id)
+                .await
+                .unwrap_or_else(|e| {
+                    eprintln!("❌ 유효하지 않은 채널 ID입니다: {channel_id}");
+                    eprintln!("   오류: {e}");
+                    std::process::exit(1);
+                });
 
             let display_name = name.unwrap_or(info.channel_name);
 
@@ -175,6 +191,17 @@ async fn main() -> anyhow::Result<()> {
                 println!("  {icon} {} ({}){extra}", ch.name, ch.id);
             }
         }
+
+        Commands::AutoLaunch { command } => match command {
+            AutoLaunchCommand::Install => {
+                autolaunch::get_auto_launch()?.enable()?;
+                println!("자동 실행이 활성화되었습니다.");
+            }
+            AutoLaunchCommand::Uninstall => {
+                autolaunch::get_auto_launch()?.disable()?;
+                println!("자동 실행이 비활성화되었습니다.");
+            }
+        },
     }
 
     Ok(())
