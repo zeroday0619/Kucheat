@@ -74,17 +74,14 @@ async fn main() -> anyhow::Result<()> {
         Commands::Add { channel_id, name } => {
             let mut config = config::Config::load()?;
 
-            let display_name = match name {
-                Some(n) => n,
-                None => {
-                    let client = api::ChzzkClient::new(&config.api)?;
-                    client
-                        .get_channel_info(&channel_id)
-                        .await
-                        .map(|info| info.channel_name)
-                        .unwrap_or_else(|_| channel_id.clone())
-                }
-            };
+            let client = api::ChzzkClient::new(&config.api)?;
+            let info = client.get_channel_info(&channel_id).await.unwrap_or_else(|e| {
+                eprintln!("❌ 유효하지 않은 채널 ID입니다: {channel_id}");
+                eprintln!("   오류: {e}");
+                std::process::exit(1);
+            });
+
+            let display_name = name.unwrap_or(info.channel_name);
 
             config.add_channel(&channel_id, &display_name);
             config.save()?;
