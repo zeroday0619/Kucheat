@@ -1,7 +1,8 @@
 use anyhow::Error;
-use auto_launch::{AutoLaunch, LinuxLaunchMode};
+use auto_launch::{AutoLaunch, AutoLaunchBuilder, LinuxLaunchMode, MacOSLaunchMode};
 use std::{env::args, fs::canonicalize};
 
+// Create auto launch profile with auto_launch library
 pub fn get_auto_launch() -> anyhow::Result<AutoLaunch> {
     // Retrieve the path of current process's binary
     let mut args_iter = args();
@@ -16,10 +17,11 @@ pub fn get_auto_launch() -> anyhow::Result<AutoLaunch> {
     };
     let path = path.to_str().unwrap();
 
-    Ok(AutoLaunch::new(
-        "Kucheat",
-        path,
-        LinuxLaunchMode::XdgAutostart,
-        &["daemon"],
-    ))
+    Ok(AutoLaunchBuilder::new()
+        .set_app_name("Kucheat")
+        .set_app_path(path)
+        .set_args(&["--daemon"])
+        .set_linux_launch_mode(LinuxLaunchMode::XdgAutostart)
+        .set_macos_launch_mode(MacOSLaunchMode::LaunchAgent)
+        .build()?)
 }

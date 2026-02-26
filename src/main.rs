@@ -26,7 +26,7 @@ enum AutoLaunchCommand {
 
 #[derive(Debug, Subcommand)]
 enum Commands {
-    /// 라이브 체크 데몬 실행 (systemd용)
+    /// 라이브 체크 데몬 실행 (systemd&auto-launch 용)
     Daemon,
     /// 시스템 트레이 앱 실행
     Tray,
@@ -192,6 +192,7 @@ async fn main() -> anyhow::Result<()> {
             }
         }
 
+        // ── auto launch ────────────────────────────────────────────
         Commands::AutoLaunch { command } => match command {
             AutoLaunchCommand::Install => {
                 autolaunch::get_auto_launch()?.enable()?;
