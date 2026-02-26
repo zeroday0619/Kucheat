@@ -35,6 +35,14 @@ static NOTIFICATION_ICON: LazyLock<String> = LazyLock::new(|| {
 /// Action button handling (opening URLs) runs in a background task so it
 /// does not block the daemon loop.
 pub async fn send_live_notification(channel_id: &str, status: &LiveStatus) -> Result<()> {
+    tracing::debug!(
+        channel_id = channel_id,
+        channel_name = %status.channel_name,
+        title = ?status.live_title,
+        category = ?status.category,
+        viewers = ?status.viewer_count,
+        "Sending live notification"
+    );
     let summary = format!("🔴 {} 방송 시작!", status.channel_name);
 
     let mut body_parts: Vec<String> = Vec::new();
@@ -85,6 +93,7 @@ pub async fn send_live_notification(channel_id: &str, status: &LiveStatus) -> Re
 
 /// Send a desktop notification when a channel goes offline.
 pub async fn send_offline_notification(channel_name: &str) -> Result<()> {
+    tracing::debug!(channel_name = channel_name, "Sending offline notification");
     let name = channel_name.to_string();
 
     tokio::task::spawn_blocking(move || {

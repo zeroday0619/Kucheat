@@ -15,7 +15,7 @@ struct Cli {
     command: Commands,
 }
 
-#[derive(Subcommand)]
+#[derive(Debug, Subcommand)]
 enum Commands {
     /// 라이브 체크 데몬 실행 (systemd용)
     Daemon,
@@ -44,12 +44,13 @@ enum Commands {
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
-            tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive("kucheat=info".parse()?),
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "kucheat=info".parse().unwrap()),
         )
         .init();
 
     let cli = Cli::parse();
+    tracing::debug!(command = ?cli.command, "CLI parsed");
 
     match cli.command {
         // ── daemon ─────────────────────────────────────────────────
@@ -72,6 +73,7 @@ async fn main() -> anyhow::Result<()> {
 
         // ── add channel ────────────────────────────────────────────
         Commands::Add { channel_id, name } => {
+            tracing::debug!(channel_id = %channel_id, name = ?name, "Adding channel");
             let mut config = config::Config::load()?;
 
             let client = api::ChzzkClient::new(&config.api)?;
@@ -90,6 +92,7 @@ async fn main() -> anyhow::Result<()> {
 
         // ── remove channel ─────────────────────────────────────────
         Commands::Remove { channel_id } => {
+            tracing::debug!(channel_id = %channel_id, "Removing channel");
             let mut config = config::Config::load()?;
             if config.remove_channel(&channel_id) {
                 config.save()?;

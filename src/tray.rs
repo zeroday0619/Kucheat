@@ -253,6 +253,7 @@ pub async fn run(source: StateSource) -> Result<()> {
     tracing::info!("Starting Kucheat tray app…");
 
     let config = Config::load()?;
+    tracing::debug!(channels = config.channels.len(), "Tray loaded config");
 
     let tray_data = Arc::new(StdMutex::new(TrayData {
         channels: config.channels.clone(),
@@ -290,6 +291,7 @@ pub async fn run(source: StateSource) -> Result<()> {
                             break;
                         }
 
+                        tracing::debug!("Daemon pushed new state, updating tray");
                         let app_state = rx.borrow_and_update().clone();
                         let config = Config::load().unwrap_or_default();
                         last_channel_ids =
@@ -331,6 +333,7 @@ pub async fn run(source: StateSource) -> Result<()> {
             const SYNC_INTERVAL: Duration = Duration::from_secs(3);
 
             loop {
+                tracing::debug!("File mode: polling state from disk");
                 let config = Config::load().unwrap_or_default();
                 let app_state = AppState::load().unwrap_or_default();
 

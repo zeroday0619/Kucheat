@@ -65,20 +65,26 @@ impl AppState {
 
     pub fn load() -> Result<Self> {
         let path = Self::state_path()?;
+        tracing::debug!(path = ?path, "Loading app state");
         if path.exists() {
             let content =
                 fs::read_to_string(&path).context("Failed to read state file")?;
-            serde_json::from_str(&content).context("Failed to parse state file")
+            let state: Self = serde_json::from_str(&content).context("Failed to parse state file")?;
+            tracing::debug!(channels = state.channels.len(), "App state loaded");
+            Ok(state)
         } else {
+            tracing::debug!("No state file found, using default");
             Ok(Self::default())
         }
     }
 
     pub fn save(&self) -> Result<()> {
         let path = Self::state_path()?;
+        tracing::debug!(path = ?path, channels = self.channels.len(), "Saving app state");
         let content =
             serde_json::to_string_pretty(self).context("Failed to serialize state")?;
         fs::write(&path, content).context("Failed to write state file")?;
+        tracing::debug!("App state saved successfully");
         Ok(())
     }
 }

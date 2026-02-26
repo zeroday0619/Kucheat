@@ -128,6 +128,8 @@ impl ChzzkClient {
         url: &str,
         auth: bool,
     ) -> Result<T> {
+        tracing::debug!(url = url, auth = auth, "API request");
+
         let mut req = self.client.get(url);
         if auth {
             req = req
@@ -143,6 +145,8 @@ impl ChzzkClient {
             .await
             .context("Failed to read response body")?;
 
+        tracing::debug!(body_len = body.len(), "API response received");
+
         let api: ApiResponse<T> =
             serde_json::from_str(&body).with_context(|| {
                 format!(
@@ -150,6 +154,8 @@ impl ChzzkClient {
                     &body[..body.len().min(500)]
                 )
             })?;
+
+        tracing::debug!(code = api.code, message = ?api.message, "API response parsed");
 
         if api.code != 200 {
             bail!(
@@ -172,9 +178,13 @@ impl ChzzkClient {
         &self,
         channel_id: &str,
     ) -> Result<ChannelInfo> {
+        tracing::debug!(channel_id = channel_id, use_official = self.use_official, "Fetching channel info");
         if self.use_official {
             match self.get_channel_info_official(channel_id).await {
-                Ok(info) => return Ok(info),
+                Ok(info) => {
+                    tracing::debug!(channel_name = %info.channel_name, "Got channel info (official)");
+                    return Ok(info);
+                }
                 Err(e) => {
                     tracing::warn!(
                         "Official channel info failed, falling back: {e}"
@@ -182,7 +192,9 @@ impl ChzzkClient {
                 }
             }
         }
-        self.get_channel_info_unofficial(channel_id).await
+        let info = self.get_channel_info_unofficial(channel_id).await?;
+        tracing::debug!(channel_name = %info.channel_name, open_live = info.open_live, "Got channel info (unofficial)");
+        Ok(info)
     }
 
     /// Official: `GET /open/v1/channels?channelIds=<id>`
@@ -245,6 +257,7 @@ impl ChzzkClient {
         &self,
         channel_id: &str,
     ) -> Result<LiveStatus> {
+        tracing::debug!(channel_id = channel_id, "Checking live status");
         let ch = self.get_channel_info_unofficial(channel_id).await?;
 
         let mut status = LiveStatus {
@@ -256,8 +269,16 @@ impl ChzzkClient {
         };
 
         if ch.open_live {
+            tracing::debug!(channel_id = channel_id, "Channel is live, fetching detail");
             match self.get_live_detail(channel_id).await {
                 Ok(detail) => {
+                    tracing::debug!(
+                        channel_id = channel_id,
+                        title = ?detail.live_title,
+                        viewers = detail.concurrent_user_count,
+                        category = ?detail.live_category_value,
+                        "Live detail fetched"
+                    );
                     status.live_title = detail.live_title;
                     status.category = detail
                         .live_category_value
@@ -271,6 +292,8 @@ impl ChzzkClient {
                     );
                 }
             }
+        } else {
+            tracing::debug!(channel_id = channel_id, "Channel is offline");
         }
 
         Ok(status)

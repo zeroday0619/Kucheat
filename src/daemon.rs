@@ -43,11 +43,14 @@ pub async fn run(state_tx: Option<watch::Sender<AppState>>) -> Result<()> {
     // Keep a running state across cycles so we never lose track of
     // channels the tray is already displaying.
     let mut state = AppState::load().unwrap_or_default();
+    tracing::debug!(channels = state.channels.len(), "Loaded persisted state");
 
     loop {
         // Wait for the normal check interval **or** a config file change.
         tokio::select! {
-            _ = ticker.tick() => {}
+            _ = ticker.tick() => {
+                tracing::debug!("Tick: periodic check interval elapsed");
+            }
             _ = config_poll.tick() => {
                 let new_ids: Vec<String> = match Config::load() {
                     Ok(c) => c.channels.iter().map(|ch| ch.id.clone()).collect(),
@@ -76,7 +79,10 @@ pub async fn run(state_tx: Option<watch::Sender<AppState>>) -> Result<()> {
         // config에서 제거된 채널은 인메모리 state에서도 제거
         state.channels.retain(|id, _| last_channel_ids.contains(id));
 
+        tracing::debug!(channels = config.channels.len(), "Starting channel check cycle");
+
         for channel in &config.channels {
+            tracing::debug!(channel_id = %channel.id, channel_name = %channel.name, "Checking channel");
             match client.check_channel_live(&channel.id).await {
                 Ok(live) => {
                     let was_live = state
@@ -129,6 +135,7 @@ pub async fn run(state_tx: Option<watch::Sender<AppState>>) -> Result<()> {
         }
 
         // Persist to disk.
+        tracing::debug!("Persisting state to disk");
         if let Err(e) = state.save() {
             tracing::error!("Failed to persist state: {e}");
         }

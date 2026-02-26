@@ -72,10 +72,19 @@ impl Config {
 
     pub fn load() -> Result<Self> {
         let path = Self::config_path()?;
+        tracing::debug!(path = ?path, "Loading config");
         if path.exists() {
             let content =
                 fs::read_to_string(&path).context("Failed to read config file")?;
-            toml::from_str(&content).context("Failed to parse config file")
+            let config: Self = toml::from_str(&content).context("Failed to parse config file")?;
+            tracing::debug!(
+                channels = config.channels.len(),
+                check_interval = config.settings.check_interval_secs,
+                notify_offline = config.settings.notify_offline,
+                use_official = !config.api.client_id.is_empty(),
+                "Config loaded"
+            );
+            Ok(config)
         } else {
             let config = Self::default();
             config.save()?;
@@ -86,13 +95,16 @@ impl Config {
 
     pub fn save(&self) -> Result<()> {
         let path = Self::config_path()?;
+        tracing::debug!(path = ?path, "Saving config");
         let content =
             toml::to_string_pretty(self).context("Failed to serialize config")?;
         fs::write(&path, content).context("Failed to write config file")?;
+        tracing::debug!("Config saved successfully");
         Ok(())
     }
 
     pub fn add_channel(&mut self, id: &str, name: &str) {
+        tracing::debug!(channel_id = id, channel_name = name, "Adding channel to config");
         self.channels.retain(|ch| ch.id != id);
         self.channels.push(ChannelConfig {
             id: id.to_string(),
@@ -101,8 +113,11 @@ impl Config {
     }
 
     pub fn remove_channel(&mut self, id: &str) -> bool {
+        tracing::debug!(channel_id = id, "Removing channel from config");
         let before = self.channels.len();
         self.channels.retain(|ch| ch.id != id);
-        self.channels.len() < before
+        let removed = self.channels.len() < before;
+        tracing::debug!(channel_id = id, removed = removed, "Channel removal result");
+        removed
     }
 }
