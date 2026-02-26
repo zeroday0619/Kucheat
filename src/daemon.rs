@@ -73,6 +73,9 @@ pub async fn run(state_tx: Option<watch::Sender<AppState>>) -> Result<()> {
 
         last_channel_ids = config.channels.iter().map(|c| c.id.clone()).collect();
 
+        // config에서 제거된 채널은 인메모리 state에서도 제거
+        state.channels.retain(|id, _| last_channel_ids.contains(id));
+
         for channel in &config.channels {
             match client.check_channel_live(&channel.id).await {
                 Ok(live) => {

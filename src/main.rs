@@ -96,6 +96,13 @@ async fn main() -> anyhow::Result<()> {
             let mut config = config::Config::load()?;
             if config.remove_channel(&channel_id) {
                 config.save()?;
+
+                // state.json에서도 채널 상태 제거
+                let mut app_state = state::AppState::load().unwrap_or_default();
+                if app_state.channels.remove(&channel_id).is_some() {
+                    let _ = app_state.save();
+                }
+
                 println!("🗑️  채널 제거: {channel_id}");
             } else {
                 println!("⚠️  해당 채널을 찾을 수 없습니다: {channel_id}");
