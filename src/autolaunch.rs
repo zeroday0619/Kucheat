@@ -22,6 +22,5 @@ pub fn get_auto_launch() -> anyhow::Result<AutoLaunch> {
         .set_app_path(path)
         .set_args(&["--daemon"])
         .set_linux_launch_mode(LinuxLaunchMode::XdgAutostart)
-        .set_macos_launch_mode(MacOSLaunchMode::LaunchAgent)
         .build()?)
 }
