@@ -25,3 +25,4 @@ anyhow = "1"
 chrono = { version = "0.4", features = ["serde"] }
 open = "5"
 image = { version = "0.25", default-features = false, features = ["png"] }
+auto-launch = "0.6.0"
